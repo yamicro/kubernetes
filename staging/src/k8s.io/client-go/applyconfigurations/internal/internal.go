@@ -1252,6 +1252,15 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: minReadySeconds
       type:
         scalar: numeric
+    - name: pauseNum
+      type:
+        scalar: numeric
+    - name: pauseProportion
+      type:
+        scalar: numeric
+    - name: pauseRestart
+      type:
+        scalar: boolean
     - name: paused
       type:
         scalar: boolean
@@ -1650,6 +1659,15 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: minReadySeconds
       type:
         scalar: numeric
+    - name: pauseNum
+      type:
+        scalar: numeric
+    - name: pauseProportion
+      type:
+        scalar: numeric
+    - name: pauseRestart
+      type:
+        scalar: boolean
     - name: paused
       type:
         scalar: boolean
@@ -2076,6 +2094,15 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: minReadySeconds
       type:
         scalar: numeric
+    - name: pauseNum
+      type:
+        scalar: numeric
+    - name: pauseProportion
+      type:
+        scalar: numeric
+    - name: pauseRestart
+      type:
+        scalar: boolean
     - name: paused
       type:
         scalar: boolean
@@ -8467,6 +8494,15 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: minReadySeconds
       type:
         scalar: numeric
+    - name: pauseNum
+      type:
+        scalar: numeric
+    - name: pauseProportion
+      type:
+        scalar: numeric
+    - name: pauseRestart
+      type:
+        scalar: boolean
     - name: paused
       type:
         scalar: boolean

@@ -34,6 +34,9 @@ type DeploymentSpecApplyConfiguration struct {
 	RevisionHistoryLimit    *int32                                    `json:"revisionHistoryLimit,omitempty"`
 	Paused                  *bool                                     `json:"paused,omitempty"`
 	ProgressDeadlineSeconds *int32                                    `json:"progressDeadlineSeconds,omitempty"`
+	PauseNum                *int32                                    `json:"pauseNum,omitempty"`
+	PauseProportion         *int32                                    `json:"pauseProportion,omitempty"`
+	PauseRestart            *bool                                     `json:"pauseRestart,omitempty"`
 }
 
 // DeploymentSpecApplyConfiguration constructs an declarative configuration of the DeploymentSpec type for use with
@@ -103,5 +106,29 @@ func (b *DeploymentSpecApplyConfiguration) WithPaused(value bool) *DeploymentSpe
 // If called multiple times, the ProgressDeadlineSeconds field is set to the value of the last call.
 func (b *DeploymentSpecApplyConfiguration) WithProgressDeadlineSeconds(value int32) *DeploymentSpecApplyConfiguration {
 	b.ProgressDeadlineSeconds = &value
+	return b
+}
+
+// WithPauseNum sets the PauseNum field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the PauseNum field is set to the value of the last call.
+func (b *DeploymentSpecApplyConfiguration) WithPauseNum(value int32) *DeploymentSpecApplyConfiguration {
+	b.PauseNum = &value
+	return b
+}
+
+// WithPauseProportion sets the PauseProportion field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the PauseProportion field is set to the value of the last call.
+func (b *DeploymentSpecApplyConfiguration) WithPauseProportion(value int32) *DeploymentSpecApplyConfiguration {
+	b.PauseProportion = &value
+	return b
+}
+
+// WithPauseRestart sets the PauseRestart field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the PauseRestart field is set to the value of the last call.
+func (b *DeploymentSpecApplyConfiguration) WithPauseRestart(value bool) *DeploymentSpecApplyConfiguration {
+	b.PauseRestart = &value
 	return b
 }

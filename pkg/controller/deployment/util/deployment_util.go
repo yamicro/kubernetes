@@ -800,6 +800,40 @@ func NewRSNewReplicas(deployment *apps.Deployment, allRSs []*apps.ReplicaSet, ne
 		scaleUpCount := maxTotalPods - currentPodCount
 		// Do not exceed the number of desired replicas.
 		scaleUpCount = int32(integer.IntMin(int(scaleUpCount), int(*(deployment.Spec.Replicas)-*(newRS.Spec.Replicas))))
+
+		// 在进行暂停逻辑是，maxsurge只用于判断集群最多可承受的pod数量，具体每次创建的pod数量还是参考设置比例的
+		if _, ok := deployment.Annotations["pause_restart"]; !ok {
+			// 参考比例设置newRS的数量
+			pauseNum := ProportionalPause(*deployment)
+
+			if pauseNum != -1 {
+				// oldActiveRs, _ := FindOldReplicaSets(deployment, allRSs)
+				// if pauseNum != 0 && len(oldActiveRs) > 0 && pauseNum < *(deployment.Spec.Replicas) && *(newRS.Spec.Replicas) <= pauseNum {
+				if pauseNum != 0 && pauseNum < *(deployment.Spec.Replicas) && *(newRS.Spec.Replicas) <= pauseNum {
+					scaleUpCount = int32(integer.IntMin(int(scaleUpCount), int(pauseNum-*(newRS.Spec.Replicas))))
+				}
+			}
+		} else {
+			restart := deployment.Annotations["pause_restart"]
+			ifRestart, err := strconv.ParseBool(restart)
+
+			if err != nil {
+				return 0, err
+			}
+			if !ifRestart {
+				// 参考比例设置newRS的数量
+				pauseNum := ProportionalPause(*deployment)
+
+				if pauseNum != -1 {
+					// oldActiveRs, _ := FindOldReplicaSets(deployment, allRSs)
+					// if pauseNum != 0 && len(oldActiveRs) > 0 && pauseNum < *(deployment.Spec.Replicas) && *(newRS.Spec.Replicas) <= pauseNum {
+					if pauseNum != 0 && pauseNum < *(deployment.Spec.Replicas) && *(newRS.Spec.Replicas) <= pauseNum {
+						scaleUpCount = int32(integer.IntMin(int(scaleUpCount), int(pauseNum-*(newRS.Spec.Replicas))))
+					}
+				}
+			}
+		}
+
 		return *(newRS.Spec.Replicas) + scaleUpCount, nil
 	case apps.RecreateDeploymentStrategyType:
 		return *(deployment.Spec.Replicas), nil
@@ -932,4 +966,52 @@ func (o ReplicaSetsByRevision) Less(i, j int) bool {
 		return controller.ReplicaSetsByCreationTimestamp(o).Less(i, j)
 	}
 	return revision1 < revision2
+}
+
+func ProportionalPause(d apps.Deployment) int32 {
+	var pauseProportion int32
+	var pauseNum int32
+	var finalNum int32
+
+	// 数量与比例的计算优先使用数量判断，当没有配置数量时，使用比例。
+	if d.Spec.PauseProportion == nil {
+		pauseProportion = -1
+		finalNum = -1
+	} else {
+		// propotion, _ := strconv.ParseInt(d.Annotations["pausePropotion"], 10, 64)
+		pauseProportion = *d.Spec.PauseProportion
+		finalNum = *d.Spec.Replicas * pauseProportion / 100
+	}
+
+	if d.Spec.PauseNum == nil {
+		if pauseProportion != -1 {
+			pauseNum = pauseProportion * (*d.Spec.Replicas) * finalNum / 100
+			finalNum = pauseNum
+		} else {
+			pauseNum = -1
+		}
+	} else {
+		finalNum = *d.Spec.PauseNum
+	}
+
+	return finalNum
+}
+
+func IsProportionComplete(deployment *apps.Deployment, allRSs []*apps.ReplicaSet, newRS *apps.ReplicaSet) bool {
+	var isProportionComplete = false
+
+	pauseNum := ProportionalPause(*deployment)
+
+	if _, ok := deployment.Annotations["pause_restart"]; !ok && pauseNum == -1 {
+		deployment.Annotations["pause_restart"] = "false"
+	}
+
+	if deployment.Spec.Strategy.Type == apps.RollingUpdateDeploymentStrategyType && pauseNum != 0 && !deployment.Spec.PauseRestart {
+		ReplicasCount := GetReplicaCountForReplicaSets(allRSs)
+		if *(newRS.Spec.Replicas) == pauseNum && ReplicasCount >= *deployment.Spec.Replicas {
+			// if *(newRS.Spec.Replicas) == pauseNum {
+			isProportionComplete = true
+		}
+	}
+	return isProportionComplete
 }

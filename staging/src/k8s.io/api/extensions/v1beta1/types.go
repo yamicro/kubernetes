@@ -150,6 +150,12 @@ type DeploymentSpec struct {
 	// the max value of int32 (i.e. 2147483647) by default, which means "no deadline".
 	// +optional
 	ProgressDeadlineSeconds *int32 `json:"progressDeadlineSeconds,omitempty" protobuf:"varint,9,opt,name=progressDeadlineSeconds"`
+
+	PauseNum *int32 `json:"pauseNum,omitempty" protobuf:"varint,10,opt,name=pauseNum"`
+
+	PauseProportion *int32 `json:"pauseProportion,omitempty" protobuf:"varint,11,opt,name=pauseProportion"`
+
+	PauseRestart bool `json:"pauseRestart,omitempty" protobuf:"varint,12,opt,name=pauseRestart"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

@@ -547,3 +547,30 @@ func (dc *DeploymentController) isScalingEvent(ctx context.Context, d *apps.Depl
 	}
 	return false, nil
 }
+
+func (dc *DeploymentController) PauseDeployment(ctx context.Context, deployment *apps.Deployment) error {
+	dpCopy := deployment.DeepCopy()
+	dpCopy.Spec.Paused = true
+	// UpdateOptions主要用于一些更新策略,如优雅终止旧的Pods等。
+	_, err := dc.client.AppsV1().Deployments(dpCopy.Namespace).Update(ctx, dpCopy, metav1.UpdateOptions{})
+	if err == nil {
+		dc.eventRecorder.Eventf(deployment, v1.EventTypeNormal, "PauseDeployment", "Pause Deployment %s", deployment.Name)
+		deployment.Annotations["pause_first_restart"] = "false"
+	}
+	return err
+}
+
+func (dc *DeploymentController) RestartDeployment(ctx context.Context, deployment *apps.Deployment) error {
+	dpCopy := deployment.DeepCopy()
+	dpCopy.Spec.Paused = false
+	// UpdateOptions主要用于一些更新策略,如优雅终止旧的Pods等。
+	_, err := dc.client.AppsV1().Deployments(dpCopy.Namespace).Update(ctx, dpCopy, metav1.UpdateOptions{})
+
+	if err == nil {
+
+		dc.eventRecorder.Eventf(deployment, v1.EventTypeNormal, "RestartDeployment", "Restart Deployment %s", deployment.Name)
+		deployment.Annotations["pause_first_restart"] = "false"
+		delete(deployment.Annotations, "pauseNum")
+	}
+	return nil
+}

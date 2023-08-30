@@ -95,6 +95,9 @@ type DeploymentController struct {
 
 	// Deployments that need to be synced
 	queue workqueue.RateLimitingInterface
+
+	// 流程中是否再次触发更新
+	updateAgain bool
 }
 
 // NewDeploymentController creates a new DeploymentController.
@@ -189,6 +192,11 @@ func (dc *DeploymentController) updateDeployment(logger klog.Logger, old, cur in
 	oldD := old.(*apps.Deployment)
 	curD := cur.(*apps.Deployment)
 	logger.V(4).Info("Updating deployment", "deployment", klog.KObj(oldD))
+	// 如果在deployment完成前，deployment被更新了，那么标记updateAgain为true
+	// if !deploymentutil.DeploymentComplete(oldD, &oldD.Status) {
+	// 	// Deployment被重启了
+	// 	dc.updateAgain = true
+	// }
 	dc.enqueueDeployment(curD)
 }
 

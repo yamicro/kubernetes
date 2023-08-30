@@ -310,6 +310,12 @@ message DeploymentSpec {
   // the max value of int32 (i.e. 2147483647) by default, which means "no deadline".
   // +optional
   optional int32 progressDeadlineSeconds = 9;
+
+  optional int32 pauseNum = 10;
+
+  optional int32 pauseProportion = 11;
+
+  optional bool pauseRestart = 12;
 }
 
 // DeploymentStatus is the most recently observed status of the Deployment.

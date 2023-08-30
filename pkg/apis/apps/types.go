@@ -415,6 +415,21 @@ type DeploymentSpec struct {
 	// the max value of int32 (i.e. 2147483647) by default, which means "no deadline".
 	// +optional
 	ProgressDeadlineSeconds *int32
+
+	PauseNum *int32
+
+	PauseProportion *int32
+
+	PauseRestart bool
+}
+
+type CanaryPauseStrategy struct {
+	// +optional
+	PauseNum *int32
+	// +optional
+	PauseProportion *int32
+	// +optional
+	PauseRestart bool
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

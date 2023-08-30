@@ -755,6 +755,9 @@ func autoConvert_v1beta2_DeploymentSpec_To_apps_DeploymentSpec(in *v1beta2.Deplo
 	out.RevisionHistoryLimit = (*int32)(unsafe.Pointer(in.RevisionHistoryLimit))
 	out.Paused = in.Paused
 	out.ProgressDeadlineSeconds = (*int32)(unsafe.Pointer(in.ProgressDeadlineSeconds))
+	out.PauseNum = (*int32)(unsafe.Pointer(in.PauseNum))
+	out.PauseProportion = (*int32)(unsafe.Pointer(in.PauseProportion))
+	out.PauseRestart = in.PauseRestart
 	return nil
 }
 
@@ -779,6 +782,9 @@ func autoConvert_apps_DeploymentSpec_To_v1beta2_DeploymentSpec(in *apps.Deployme
 	out.Paused = in.Paused
 	// WARNING: in.RollbackTo requires manual conversion: does not exist in peer-type
 	out.ProgressDeadlineSeconds = (*int32)(unsafe.Pointer(in.ProgressDeadlineSeconds))
+	out.PauseNum = (*int32)(unsafe.Pointer(in.PauseNum))
+	out.PauseProportion = (*int32)(unsafe.Pointer(in.PauseProportion))
+	out.PauseRestart = in.PauseRestart
 	return nil
 }
 

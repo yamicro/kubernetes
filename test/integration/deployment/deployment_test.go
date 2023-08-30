@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -1304,4 +1305,158 @@ func TestReplicaSetOrphaningAndAdoptionWhenLabelsChange(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("failed waiting for replicaset adoption by deployment %q to complete: %v", deploymentName, err)
 	}
+}
+
+func TestProportionPause(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	closeFn, rm, dc, informers, c := dcSetup(ctx, t)
+	defer closeFn()
+
+	name := "test-rolling-update-deployment"
+	ns := framework.CreateNamespaceOrDie(c, name, t)
+	defer framework.DeleteNamespaceOrDie(c, ns, t)
+
+	// Start informer and controllers
+	stopControllers := runControllersAndInformers(t, rm, dc, informers)
+	defer stopControllers()
+
+	replicas := int32(10)
+	tester := &deploymentTester{t: t, c: c, deployment: newDeployment(name, ns.Name, replicas)}
+	tester.deployment.Spec.MinReadySeconds = 3
+	tester.deployment.Spec.PauseNum = new(int32)
+	tester.deployment.Spec.PauseRestart = false
+
+	surge := intstr.FromString("50%")
+	// maxUnvilable := intstr.FromString("1")
+	tester.deployment.Spec.Strategy.RollingUpdate = &apps.RollingUpdateDeployment{
+		MaxUnavailable: &surge,
+		MaxSurge:       &surge,
+	}
+
+	// Create a deployment.
+	var err error
+	tester.deployment, err = c.AppsV1().Deployments(ns.Name).Create(context.TODO(), tester.deployment, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("failed to create deployment %s: %v", tester.deployment.Name, err)
+	}
+	oriImage := tester.deployment.Spec.Template.Spec.Containers[0].Image
+	if err := tester.waitForDeploymentRevisionAndImage("1", oriImage); err != nil {
+		t.Fatal(err)
+	}
+	if err := tester.waitForDeploymentCompleteAndMarkPodsReady(); err != nil {
+		t.Fatal(err)
+	}
+
+	// 配置暂停规则
+	// tester.deployment.Annotations["pause_restart"] = "false"
+	// tester.deployment.Annotations["pauseProportion"] = fmt.Sprintf("%s", "3")
+	// tester.deployment, err = c.AppsV1().Deployments(ns.Name).Update(context.TODO(), tester.deployment, metav1.CreateOptions{})
+	image := "new-image"
+	tester.deployment.Annotations = make(map[string]string)
+	tester.deployment.Labels = make(map[string]string)
+
+	imageFn := func(update *apps.Deployment) {
+		update.Spec.Template.Spec.Containers[0].Image = image
+		update.Spec.PauseNum = new(int32)
+		*update.Spec.PauseNum = 3
+		update.Spec.PauseRestart = false
+		update.Spec.PauseProportion = new(int32)
+		*update.Spec.PauseProportion = 0
+		// update.Spec.Paused = false
+	}
+
+	tester.deployment, err = tester.updateDeployment(imageFn)
+	// tester.deployment.Annotations["pause-restart"] = fmt.Sprintf("%s", "")
+	if err != nil {
+		t.Fatalf("failed to create deployment %s: %v", tester.deployment.Name, err)
+	}
+	oriImage = tester.deployment.Spec.Template.Spec.Containers[0].Image
+	if err := tester.waitForDeploymentRevisionAndImage("2", oriImage); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(3000 * time.Millisecond)
+	if err := tester.checkReplicaSetsNum(); err != nil {
+		t.Fatal(err)
+	}
+
+	// 1. Roll out a new image.
+	image = "new-image"
+	// 配置重启标签
+	tester.deployment.Annotations["pause_restart"] = "true"
+
+	// if oriImage == image {
+	// 	t.Fatalf("bad test setup, deployment %s roll out with the same image", tester.deployment.Name)
+	// }
+	imageFn = func(update *apps.Deployment) {
+		update.Spec.Template.Spec.Containers[0].Image = image
+		update.Spec.PauseRestart = true
+		// update.Labels["restart"] = "1"
+	}
+	tester.deployment, err = tester.updateDeployment(imageFn)
+	if err != nil {
+		t.Fatalf("failed to update deployment %s: %v", tester.deployment.Name, err)
+	}
+	if err := tester.waitForDeploymentRevisionAndImage("3", oriImage); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := tester.waitForDeploymentCompleteAndCheckRollingAndMarkPodsReady(); err != nil {
+		t.Fatal(err)
+	}
+	if err := tester.checkIfRestart(); err != nil {
+		t.Fatal(err)
+	}
+	// if err := tester.waitForDeploymentRevisionAndImage("2", oriImage); err != nil {
+	// 	t.Fatal(err)
+	// }
+
+	// if err := tester.waitForDeploymentRevisionAndImage("3", oriImage); err != nil {
+	// 	t.Fatal(err)
+	// }
+
+	// if tester.deployment.Spec.Paused {
+	// 	t.Fatal(fmt.Errorf("Falied to restart deployment"))
+	// }
+
+	// // 2. Roll over a deployment before the previous rolling update finishes.
+	// image = "dont-finish"
+	// imageFn = func(update *apps.Deployment) {
+	// 	update.Spec.Template.Spec.Containers[0].Image = image
+	// }
+	// tester.deployment, err = tester.updateDeployment(imageFn)
+	// if err != nil {
+	// 	t.Fatalf("failed to update deployment %s: %v", tester.deployment.Name, err)
+	// }
+	// if err := tester.waitForDeploymentRevisionAndImage("3", image); err != nil {
+	// 	t.Fatal(err)
+	// }
+
+	// // We don't mark pods as ready so that rollout won't finish.
+	// // Before the rollout finishes, trigger another rollout.
+	// image = "rollover"
+	// imageFn = func(update *apps.Deployment) {
+	// 	update.Spec.Template.Spec.Containers[0].Image = image
+	// }
+	// tester.deployment, err = tester.updateDeployment(imageFn)
+	// if err != nil {
+	// 	t.Fatalf("failed to update deployment %s: %v", tester.deployment.Name, err)
+	// }
+	// if err := tester.waitForDeploymentRevisionAndImage("4", image); err != nil {
+	// 	t.Fatal(err)
+	// }
+	// if err := tester.waitForDeploymentCompleteAndCheckRollingAndMarkPodsReady(); err != nil {
+	// 	t.Fatal(err)
+	// }
+	// _, allOldRSs, err := testutil.GetOldReplicaSets(tester.deployment, c)
+	// if err != nil {
+	// 	t.Fatalf("failed retrieving old replicasets of deployment %s: %v", tester.deployment.Name, err)
+	// }
+	// for _, oldRS := range allOldRSs {
+	// 	if *oldRS.Spec.Replicas != 0 {
+	// 		t.Errorf("expected old replicaset %s of deployment %s to have 0 replica, got %d", oldRS.Name, tester.deployment.Name, *oldRS.Spec.Replicas)
+	// 	}
+	// }
 }

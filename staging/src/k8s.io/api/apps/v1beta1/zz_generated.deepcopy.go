@@ -230,6 +230,16 @@ func (in *DeploymentSpec) DeepCopyInto(out *DeploymentSpec) {
 		*out = new(int32)
 		**out = **in
 	}
+	if in.PauseNum != nil {
+		in, out := &in.PauseNum, &out.PauseNum
+		*out = new(int32)
+		**out = **in
+	}
+	if in.PauseProportion != nil {
+		in, out := &in.PauseProportion, &out.PauseProportion
+		*out = new(int32)
+		**out = **in
+	}
 	return
 }
 

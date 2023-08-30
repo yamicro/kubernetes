@@ -589,6 +589,16 @@ func ValidateDeploymentSpec(spec, oldSpec *apps.DeploymentSpec, fldPath *field.P
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("progressDeadlineSeconds"), spec.ProgressDeadlineSeconds, "must be greater than minReadySeconds"))
 		}
 	}
+
+	if spec.PauseNum != nil {
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.PauseNum), fldPath.Child("pauseNum"))...)
+	}
+	if spec.PauseProportion != nil {
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.PauseProportion), fldPath.Child("pauseProportion"))...)
+	}
+	// if spec.PauseRestart != nil {
+	// 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.PauseRestart), fldPath.Child("pauseRestart"))...)
+	// }
 	return allErrs
 }
 

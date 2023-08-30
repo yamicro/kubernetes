@@ -313,6 +313,12 @@ message DeploymentSpec {
   // reason will be surfaced in the deployment status. Note that progress will
   // not be estimated during the time a deployment is paused. Defaults to 600s.
   optional int32 progressDeadlineSeconds = 9;
+
+  optional int32 pauseNum = 10;
+
+  optional int32 pauseProportion = 11;
+
+  optional bool pauseRestart = 12;
 }
 
 // DeploymentStatus is the most recently observed status of the Deployment.

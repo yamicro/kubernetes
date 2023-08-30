@@ -229,6 +229,9 @@ func (o *CreateDeploymentOptions) createDeployment() *appsv1.Deployment {
 				},
 				Spec: o.buildPodSpec(),
 			},
+			PauseNum:        new(int32),
+			PauseProportion: new(int32),
+			PauseRestart:    false,
 		},
 	}
 

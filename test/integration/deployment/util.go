@@ -19,6 +19,7 @@ package deployment
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -460,6 +461,85 @@ func (d *deploymentTester) checkDeploymentStatusReplicasFields(replicas, updated
 	}
 	if deployment.Status.UnavailableReplicas != unavailableReplicas {
 		return fmt.Errorf("unexpected .replicas: expect %d, got %d", unavailableReplicas, deployment.Status.UnavailableReplicas)
+	}
+	return nil
+}
+
+func (d *deploymentTester) checkReplicaSetsNum() error {
+	var proportion int32
+	var num int32
+	if *d.deployment.Spec.PauseNum == 0 {
+		num = -1
+	} else {
+
+		num = *d.deployment.Spec.PauseNum
+	}
+
+	if *d.deployment.Spec.PauseProportion == 0 {
+		proportion = -1
+	} else {
+
+		proportion = *d.deployment.Spec.PauseProportion
+	}
+
+	if proportion != -1 {
+		num = int32(proportion) * int32((*d.deployment.Spec.Replicas)) / int32(100)
+
+	}
+	rdlist, err := deploymentutil.ListReplicaSets(d.deployment, deploymentutil.RsListFromClient(d.c.AppsV1()))
+
+	newRS := deploymentutil.FindNewReplicaSet(d.deployment, rdlist)
+	oldRS := deploymentutil.FindNewReplicaSet(d.deployment, rdlist)
+
+	if err != nil {
+		return err
+	}
+	time.Sleep(600 * time.Millisecond)
+	if num == int32(*newRS.Spec.Replicas) {
+		return nil
+	} else {
+		return fmt.Errorf("The pause statue wrong, The current status oldRS is %d and newRS is %d", *newRS.Spec.Replicas, *oldRS.Spec.Replicas)
+	}
+
+}
+
+func (d *deploymentTester) checkIfRestart() error {
+	var proportion int64
+	var num int64
+	if _, ok := d.deployment.Annotations["pauseNum"]; !ok {
+		num = -1
+	} else {
+		temp, err := strconv.ParseInt(d.deployment.Annotations["pauseNum"], 10, 32)
+		if err != nil {
+			return err
+		}
+		num = int64(temp)
+	}
+	fmt.Print(num)
+	if _, ok := d.deployment.Annotations["pauseProportion"]; !ok {
+		proportion = -1
+	} else {
+		temp, err := strconv.ParseInt(d.deployment.Annotations["pauseProportion"], 10, 32)
+		if err != nil {
+			return err
+		}
+		proportion = temp
+	}
+
+	if proportion != -1 {
+		num = int64(proportion) * int64((*d.deployment.Spec.Replicas)) / int64(100)
+
+	}
+	rdlist, err := deploymentutil.ListReplicaSets(d.deployment, deploymentutil.RsListFromClient(d.c.AppsV1()))
+
+	if err != nil {
+		return err
+	}
+	newRS := deploymentutil.FindNewReplicaSet(d.deployment, rdlist)
+	oldRS := deploymentutil.FindNewReplicaSet(d.deployment, rdlist)
+
+	if d.deployment.Spec.Paused == false && newRS.Spec.Replicas == d.deployment.Spec.Replicas && *oldRS.Spec.Replicas == 0 {
+		return nil
 	}
 	return nil
 }

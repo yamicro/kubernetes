@@ -456,6 +456,12 @@ type DeploymentSpec struct {
 	// not be estimated during the time a deployment is paused. Defaults to 600s.
 	// +optional
 	ProgressDeadlineSeconds *int32 `json:"progressDeadlineSeconds,omitempty" protobuf:"varint,9,opt,name=progressDeadlineSeconds"`
+
+	PauseNum *int32 `json:"pauseNum,omitempty" protobuf:"varint,10,opt,name=pauseNum"`
+
+	PauseProportion *int32 `json:"pauseProportion,omitempty" protobuf:"varint,11,opt,name=pauseProportion"`
+
+	PauseRestart bool `json:"pauseRestart,omitempty" protobuf:"varint,12,opt,name=pauseRestart"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

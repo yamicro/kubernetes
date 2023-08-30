@@ -494,6 +494,9 @@ func autoConvert_v1beta1_DeploymentSpec_To_apps_DeploymentSpec(in *v1beta1.Deplo
 	out.Paused = in.Paused
 	out.RollbackTo = (*apps.RollbackConfig)(unsafe.Pointer(in.RollbackTo))
 	out.ProgressDeadlineSeconds = (*int32)(unsafe.Pointer(in.ProgressDeadlineSeconds))
+	out.PauseNum = (*int32)(unsafe.Pointer(in.PauseNum))
+	out.PauseProportion = (*int32)(unsafe.Pointer(in.PauseProportion))
+	out.PauseRestart = in.PauseRestart
 	return nil
 }
 
@@ -518,6 +521,9 @@ func autoConvert_apps_DeploymentSpec_To_v1beta1_DeploymentSpec(in *apps.Deployme
 	out.Paused = in.Paused
 	out.RollbackTo = (*v1beta1.RollbackConfig)(unsafe.Pointer(in.RollbackTo))
 	out.ProgressDeadlineSeconds = (*int32)(unsafe.Pointer(in.ProgressDeadlineSeconds))
+	out.PauseNum = (*int32)(unsafe.Pointer(in.PauseNum))
+	out.PauseProportion = (*int32)(unsafe.Pointer(in.PauseProportion))
+	out.PauseRestart = in.PauseRestart
 	return nil
 }
 
