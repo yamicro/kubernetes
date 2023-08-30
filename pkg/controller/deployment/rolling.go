@@ -20,13 +20,32 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strconv"
 
 	apps "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/utils/integer"
 )
+
+type State int
+
+var isRestart bool = true
+var isPause bool = false
+var FirstPause bool
+var RestartInvalid bool = true
+var status State = StateNormal
+
+const (
+	StateNormal State = iota
+	StatePause
+	StateRestart
+)
+
+var StateIntenal bool = false
 
 // rolloutRolling implements the logic for rolling a new replica set.
 func (dc *DeploymentController) rolloutRolling(ctx context.Context, d *apps.Deployment, rsList []*apps.ReplicaSet) error {
@@ -35,6 +54,123 @@ func (dc *DeploymentController) rolloutRolling(ctx context.Context, d *apps.Depl
 		return err
 	}
 	allRSs := append(oldRSs, newRS)
+
+	// pauseNum := deploymentutil.ProportionalPause(*d)
+
+	// if _, ok := d.Annotations["pause_restart"]; !ok && pauseNum == -1 {
+	// 	d.Annotations["pause_restart_status"] = "Normal"
+	// 	status = StateNormal
+	// } else if ok && pauseNum == -1 {
+	// 	d.Annotations["pause_restart_status"] = "Restart"
+	// 	status = StateRestart
+	// } else if pauseNum != -1 && !ok {
+	// 	d.Annotations["pause_restart_status"] = "Pause"
+	// 	status = StatePause
+	// }
+
+	var pauseNumStr string
+	if d.Spec.PauseNum == nil {
+		pauseNumStr = "nil"
+	} else {
+		pauseNumStr = strconv.Itoa(int(*d.Spec.PauseNum))
+	}
+
+	pauseRestartStr := strconv.FormatBool(d.Spec.PauseRestart)
+
+	dc.eventRecorder.Eventf(d, v1.EventTypeNormal, "Check pauseNum is %s", pauseNumStr)
+	dc.eventRecorder.Eventf(d, v1.EventTypeNormal, "Check pauseRestart is %s", pauseRestartStr)
+
+	// var isRestart bool
+	// var firstRestart bool
+	// 判断是否为重启, 使用添加标签判断是否为重启之后的状态，逻辑写在RestartDeployment中
+	// if FirstPause, ok := d.Annotations["pause_first_restart"]; !ok { // 没有pause_first_restart标签，则说明重启还未成功
+
+	// 	if isPause && !isRestart {
+	// 		if d.Spec.PauseRestart {
+	// 			if err := dc.RestartDeployment(ctx, d); err != nil {
+	// 				return err
+	// 			}
+	// 			isPause = false
+	// 			isRestart = true
+	// 			// 设置一个暂停状态拉起的等待时间
+	// 			// time.Sleep(3000 * time.Millisecond)
+	// 			//释放信号量
+	// 			d.Annotations["pause_first_restart"] = "true"
+	// 		}
+	// 	}
+
+	// 	if !isPause && isRestart && deploymentutil.ProportionalPause(*d) != -1 {
+	// 		// 若不是重启，则进行判断是否暂停的操作。
+	// 		if deploymentutil.IsProportionComplete(d, allRSs, newRS) {
+	// 			if err := dc.PauseDeployment(ctx, d); err != nil {
+	// 				klog.Error(err)
+	// 				return err
+	// 			}
+	// 			klog.Warning("Deployment is paused")
+	// 			isPause = true
+	// 			//释放信号量
+	// 			d.Annotations["pause_first_restart"] = "true"
+	// 		}
+	// 	}
+	// } else {
+
+	// if isPause && !isRestart && status == StateRestart && RestartInvalid {
+	// if dc.restartLabel {
+	// 	err := dc.RestartDeployment(ctx, d)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	// TODO 重启deployment之后，删除旧的replicaset
+	// 	// 考虑如何设置newRS和oldRS的
+	// 	// for _, oldRS := range oldRSs {
+	// 	// 	dc.deleteReplicaSet(oldRS)
+	// 	// }
+	// 	isPause = false
+	// 	isRestart = true
+	// 	RestartInvalid = false
+	// 	dc.restartLabel = false
+	// 	d.Annotations["pause_first_restart"] = "true"
+
+	// }
+
+	// 若中途更新，则重置状态
+	// if dc.updateAgain {
+	// 	status = StateNormal
+	// 	dc.updateAgain = false
+	// }
+
+	if d.Spec.PauseRestart && status == StatePause {
+		if err := dc.RestartDeployment(ctx, d); err != nil {
+			return err
+		}
+		klog.Warning("Deployment is restart")
+		// oldRSs = append(oldRSs, newRS)
+		*newRS.Spec.Replicas = *d.Spec.Replicas
+		isPause = false
+		isRestart = true
+		status = StateRestart
+		// 设置一个暂停状态拉起的等待时间
+		// time.Sleep(3000 * time.Millisecond)
+		//释放信号量
+		d.Annotations["pause_first_restart"] = "true"
+	}
+
+	if !isPause && isRestart && d.Spec.PauseNum != nil || d.Spec.PauseProportion != nil && deploymentutil.ProportionalPause(*d) != -1 && status == StateNormal {
+		// 若不是重启，则进行判断是否暂停的操作。
+		if deploymentutil.IsProportionComplete(d, allRSs, newRS) {
+			if err := dc.PauseDeployment(ctx, d); err != nil {
+				klog.Error(err)
+				return err
+			}
+			klog.Warning("Deployment is paused")
+			isPause = true
+			isRestart = false
+			status = StatePause
+			//释放信号量
+			d.Annotations["pause_first_restart"] = "true"
+			// return nil
+		}
+	}
 
 	// Scale up, if we can.
 	scaledUp, err := dc.reconcileNewReplicaSet(ctx, allRSs, newRS, d)
@@ -59,6 +195,16 @@ func (dc *DeploymentController) rolloutRolling(ctx context.Context, d *apps.Depl
 	if deploymentutil.DeploymentComplete(d, &d.Status) {
 		if err := dc.cleanupDeployment(ctx, oldRSs, d); err != nil {
 			return err
+		}
+
+		if status == StateRestart {
+			status = StateNormal
+			dpCopy := d.DeepCopy()
+			*dpCopy.Spec.PauseNum = -1
+			_, err := dc.client.AppsV1().Deployments(dpCopy.Namespace).Update(ctx, dpCopy, metav1.UpdateOptions{})
+			if err == nil {
+				dc.eventRecorder.Eventf(d, v1.EventTypeNormal, "DeloymentFinished", "Deployment Status become to %s", "2")
+			}
 		}
 	}
 
